@@ -54,20 +54,17 @@ class KqueueIOManager:
         self._force_wakeup.wakeup_thread_and_signal_safe()
 
     def get_events(self, timeout):
+        if timeout == 0:
+            return []
         # max_events must be > 0 or kqueue gets cranky
         # and we generally want this to be strictly larger than the actual
         # number of events we get, so that we can tell that we've gotten
         # all the events in just 1 call.
-        max_events = len(self._registered) + 1
-        events = []
-        while True:
-            batch = self._kqueue.control([], max_events, timeout)
-            events += batch
-            if len(batch) < max_events:
-                break
-            else:
-                timeout = 0
-                # and loop back to the start
+        max_events = len(self._registered)
+        # DANEROUSLY CHEESY HACK: waits for wakeup event and socket event ;)
+        if max_events < 2:
+            return []
+        events = self._kqueue.control(None, max_events + 1)
         return events
 
     def process_events(self, events):
